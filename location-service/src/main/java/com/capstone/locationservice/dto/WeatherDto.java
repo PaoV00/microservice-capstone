@@ -1,0 +1,33 @@
+package com.capstone.locationservice.dto;
+
+import com.capstone.locationservice.model.Weather;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class WeatherDto {
+    private String condition;
+    private Double temperature;
+    private Double hi_temperature;
+    private Double low_temperature;
+    private Double cloudCoverage;
+    private Double windSpeed;
+    private Long   fetchedAt;
+
+    public Weather toWeather(){
+        Weather weather = new Weather();
+        weather.setCondition(condition);
+        weather.setTemperature(temperature);
+        weather.setHi_temperature(hi_temperature);
+        weather.setLow_temperature(low_temperature);
+        weather.setCloudCoverage(cloudCoverage);
+        weather.setWindSpeed(windSpeed);
+        weather.setFetchedAt(fetchedAt);
+        return weather;
+    }
+}
