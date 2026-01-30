@@ -13,7 +13,7 @@ public class WeatherResponse {
     private List<Weather> weather;
     private Main main;
     private Wind wind;
-    private Cloud cloud;
+    private Clouds clouds;
     private Sys sys;
     private long dt;
 
@@ -56,8 +56,8 @@ public class WeatherResponse {
 
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class Cloud {
-        private Integer cloudPercentage;
+    public static class Clouds {
+        private Integer all;
     }
 
 

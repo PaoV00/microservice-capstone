@@ -14,7 +14,7 @@ import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/location")
+@RequestMapping("/api/location")
 public class LocationRest {
 
     private final LocationService service;
@@ -29,10 +29,9 @@ public class LocationRest {
         return ResponseEntity.ok(service.get(id));
     }
 
-    @GetMapping
-    @ResponseStatus(HttpStatus.OK)
-    public List<LocationResponse> getAll() {
-        return service.getAll();
+    @GetMapping()
+    public ResponseEntity<String> getAddressId(@RequestParam String city, @RequestParam String stateCode, @RequestParam String countryCode){
+        return ResponseEntity.ok(service.getLocationIdIfDontExistCreateNewLocation(city, stateCode, countryCode));
     }
 
     @PatchMapping("/{id}")

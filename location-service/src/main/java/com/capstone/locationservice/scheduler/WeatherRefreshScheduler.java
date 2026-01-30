@@ -1,14 +1,14 @@
 package com.capstone.locationservice.scheduler;
 
 import com.capstone.locationservice.dto.WeatherDto;
-import com.capstone.locationservice.model.Address;
 import com.capstone.locationservice.model.Location;
 import com.capstone.locationservice.repository.LocationRepository;
+import com.capstone.locationservice.service.LocationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
 
@@ -18,30 +18,37 @@ import java.util.List;
 public class WeatherRefreshScheduler {
 
     private final LocationRepository locationRepository;
-    private final WebClient.Builder webClient;
+    private final LocationService locationService;
 
     @Scheduled(fixedRateString = "PT1M")
-    public void refreshWeatherForAllLocations(){
+    @SchedulerLock(
+            name = "refreshWeatherForAllLocations",
+            lockAtMostFor = "PT10M",
+            lockAtLeastFor = "PT30S"
+    )
+    public void refreshWeatherForAllLocations() {
+
         log.info("Starting weather refresh for all locations....");
-
         List<Location> locations = locationRepository.findAll();
-        for(Location location : locations){
-            Address address = location.getAddress();
 
-            WeatherDto weather = webClient.build().get()
-                    .uri("http://weather-service/api/weather",
-                            uriBuilder -> uriBuilder
-                                    .queryParam("city", address.getCity())
-                                    .queryParam("stateCode", address.getStateCode())
-                                    .queryParam("countryCode", address.getCountryCode())
-                                    .build())
-                    .retrieve()
-                    .bodyToMono(WeatherDto.class)
-                    .block();
-            location.setWeather(weather.toWeather());
+        for (Location loc : locations) {
+            String city = loc.getAddress().getCity();
+            String state = loc.getAddress().getStateCode();
+            String country = loc.getAddress().getCountryCode();
+
+            try {
+                WeatherDto dto = locationService.getWeatherData(city, state, country);
+                if (dto != null) {
+                    loc.setWeather(dto.toWeather());
+                    locationRepository.save(loc);
+                } else {
+                    log.warn("Weather refresh returned null for {},{},{}", city, state, country);
+                }
+            } catch (Exception ex) {
+                log.warn("Weather refresh failed for {},{},{} : {}", city, state, country, ex.getMessage());
+
+            }
         }
-        locationRepository.saveAll(locations);
-        log.info("Completed scheduled weather refresh for {} locations", locations.size());
     }
 
 }

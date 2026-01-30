@@ -2,6 +2,8 @@ package com.capstone.weatherservice.dto;
 
 import lombok.*;
 
+import java.time.Instant;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -14,5 +16,5 @@ public class WeatherDto {
     private Double low_temperature;
     private Double cloudCoverage;
     private Double windSpeed;
-    private Long   fetchedAt;
+    private Instant fetchedAt;
 }

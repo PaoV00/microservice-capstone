@@ -17,6 +17,7 @@ public class UserResponse {
     private String firstName;
     private String lastName;
     private String email;
+    private AddressDto address;
     private String locationId;
     private List<String> favoriteLocationIds;
 }

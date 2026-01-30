@@ -34,15 +34,8 @@ public class User {
     @NotBlank
     private String email;
 
-    private String locationId;
-
-    @ElementCollection
-    @CollectionTable(
-            name = "user_favorite_locations",
-            joinColumns = @JoinColumn(name = "user_id")
-    )
-    @Column(name = "location_id")
-    private List<String> favoriteLocationIds = new ArrayList<>();
+    @Embedded
+    private Address address;
 
     public void updateFirstName(String newFirst) {
         if (newFirst != null && !newFirst.equals(this.firstName)) this.firstName = newFirst;
@@ -64,11 +57,5 @@ public class User {
 
     public void updatePassword(String newPassword) {
         if (newPassword != null && !newPassword.isBlank() && !newPassword.equals(this.password)) this.password = newPassword;
-    }
-
-    public void updateLocationId(String newLocationId) {
-        if (newLocationId != null && !newLocationId.equals(this.locationId)) {
-            this.locationId = newLocationId;
-        }
     }
 }

@@ -24,6 +24,5 @@ public class UserRequest {
     @NotBlank
     @Email(message = "Please provide a valid email address")
     private String email;
-    private String locationId;
-    private List<String> favoriteLocationIds;
+    private AddressDto address;
 }

@@ -10,17 +10,23 @@ import lombok.*;
 @Setter
 @Builder
 public class AddressDto {
+    private String locationId;
     private String number;
     private String street;
     private String city;
-    private String state;
+    private String stateCode;
     private String zip;
+    private String countryCode;
 
-    public AddressDto(Address address) {
-        this.number = address.getNumber();
-        this.street = address.getStreet();
-        this.city = address.getCity();
-        this.state = address.getState();
-        this.zip = address.getZip();
+    public Address toAddress() {
+        return Address.builder()
+                .locationId(locationId != null ? locationId : null)
+                .number(number)
+                .street(street)
+                .city(city)
+                .stateCode(stateCode)
+                .countryCode(countryCode)
+                .zip(zip)
+                .build();
     }
 }

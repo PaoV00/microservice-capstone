@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
 import java.util.Optional;
 
 @Service
@@ -54,14 +55,12 @@ public class WeatherService {
         Double hiTemperature = weather.getMain() != null ? weather.getMain().getTempMax()  : null;
         Double windSpeed     = weather.getWind() != null ? weather.getWind().getSpeed()    : null;
 
-        Double cloudCoverage = (weather.getCloud() != null) ?
-                Optional.ofNullable(weather.getCloud().getCloudPercentage())
-                        .map(Integer::doubleValue)
-                        .orElse(null)
+        Double cloudCoverage = (weather.getClouds() != null && weather.getClouds().getAll() != null)
+                ? weather.getClouds().getAll().doubleValue()
                 : null;
 
 
-        Long fetchedAt = weather.getDt(); // Unix seconds from API
+        Instant fetchedAt = Instant.ofEpochSecond(weather.getDt());
 
         return WeatherDto.builder()
                 .condition(condition)

@@ -1,6 +1,5 @@
 package com.capstone.userservice.service;
 
-import com.capstone.userservice.dto.LocationResponse;
 import com.capstone.userservice.dto.UserRequest;
 import com.capstone.userservice.dto.UserResponse;
 import com.capstone.userservice.exceptions.BadInputException;
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -32,22 +30,24 @@ public class UserService {
         if (userRepository.existsByUsername(userRequest.getUsername())) {
             throw new DuplicateUserException("Username already exists");
         }
-
         if (userRepository.existsByEmail(userRequest.getEmail())) {
             throw new DuplicateUserException("Email already registered");
         }
 
+        Address address = new Address(userRequest.getAddress());
+
+        // Only call location-service if address is present/valid
+        String locationId = getLocationId(address);
+        address.setLocationId(locationId);
+        log.info("Address set with locationId: {}" + locationId);
         User newUser = User.builder()
                 .firstName(userRequest.getFirstName())
                 .lastName(userRequest.getLastName())
                 .username(userRequest.getUsername())
                 .password(userRequest.getPassword())
                 .email(userRequest.getEmail())
-                .favoriteLocationIds(userRequest.getFavoriteLocationIds() != null
-                        ? userRequest.getFavoriteLocationIds() : new ArrayList<>())
+                .address(address)
                 .build();
-
-
 
         userRepository.save(newUser);
         log.info("User created: {}", newUser.getUserId());
@@ -105,21 +105,25 @@ public class UserService {
             }
         }
 
-        if (updates.containsKey("locationId")) {
-            user.updateLocationId((String) updates.get("locationId"));
-            log.info("LocationId updated: {}", user.getLocationId());
-        }
+        if(updates.containsKey("address")){
+            Map<String, Object> addrUpdates = (Map<String, Object>) updates.get("address");
 
-        if (updates.containsKey("favoriteLocationIds")) {
-            Object listObj = updates.get("favoriteLocationIds");
-            if (listObj instanceof List<?> list) {
-                user.setFavoriteLocationIds(
-                        list.stream()
-                                .map(Object::toString)
-                                .toList()
-                );
-            } else {
-                throw new BadInputException("favoriteLocationIds must be a list");
+            Address address = user.getAddress();
+
+            if(addrUpdates.containsKey("number")) address.setNumber(addrUpdates.get("number").toString());
+            if(addrUpdates.containsKey("street")) address.setStreet(addrUpdates.get("street").toString());
+            if(addrUpdates.containsKey("city")) {
+                address.setCity(addrUpdates.get("city").toString());
+                address.setLocationId(getLocationId(address));
+            }
+            if(addrUpdates.containsKey("stateCode")) {
+                address.setStateCode(addrUpdates.get("stateCode").toString());
+                address.setLocationId(getLocationId(address));
+            }
+            if(addrUpdates.containsKey("zip")) address.setZip(addrUpdates.get("zip").toString());
+            if(addrUpdates.containsKey("countryCode")) {
+                address.setCountryCode(addrUpdates.get("countryCode").toString());
+                address.setLocationId(getLocationId(address));
             }
         }
 
@@ -142,14 +146,23 @@ public class UserService {
                 .lastName(user.getLastName())
                 .username(user.getUsername())
                 .email(user.getEmail())
-                .locationId(user.getLocationId())
-                .favoriteLocationIds(user.getFavoriteLocationIds())
+                .address(user.getAddress().toDto())
                 .build();
     }
 
     private String getLocationId(Address address) {
-        LocationResponse locationId = webClient.build().get()
-                .uri("http://location-service/api/location",)
+        String locationId = webClient.build().get()
+                .uri("http://location-service/api/location",
+                uriBuilder -> uriBuilder
+                        .queryParam("city", address.getCity())
+                        .queryParam("stateCode", address.getStateCode())
+                        .queryParam("countryCode", address.getCountryCode())
+                        .build())
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+        return locationId;
     }
+
 
 }

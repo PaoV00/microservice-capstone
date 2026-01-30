@@ -32,35 +32,65 @@ public class LocationService {
 
 
     public LocationResponse create(LocationRequest req) {
-        if(repository.existsByAddress_CityAndAddress_StateCodeAndAddress_ZipAndAddress_CountryCode(
+        if(repository.existsByAddress_CityAndAddress_StateCodeAndAddress_CountryCode(
                 req.getAddress().getCity(), req.getAddress().getStateCode(),
-                req.getAddress().getZip(), req.getAddress().getCountryCode()
+                req.getAddress().getCountryCode()
         )){
-            throw new DuplicateException("Cannot create a new location, because it already exists");
+            throw new DuplicateException("Location already exists");
         }
-
-        // Build address before adding to location
         Address newAddress = buildAddress(req);
-
         //get weather base on address
         WeatherDto weatherDto = getWeatherData(newAddress.getCity(), newAddress.getStateCode(), newAddress.getCountryCode());
-
         Location location = Location.builder()
                 .locationId(UUID.randomUUID().toString())
                 .name(req.getName() != null ? req.getName() : null)
-                .address(newAddress)
                 .weather(weatherDto.toWeather())
                 .build();
+        newAddress.setLocationId(location.getLocationId());
+        location.setAddress(newAddress);
         location.normalize();
 
         repository.save(location);
         return toResponse(location);
     }
 
+    public Location createLocation(String city, String stateCode, String countryCode) {
+        Address newAddress = new Address();
+        newAddress.setCity(city);
+        newAddress.setStateCode(stateCode);
+        newAddress.setCountryCode(countryCode);
+        newAddress.normalize();
+        Weather weather = getWeatherData(city, stateCode, countryCode).toWeather();
+
+        Location newLocation = Location.builder()
+                .locationId(UUID.randomUUID().toString())
+                .name(null)
+                .weather(weather)
+                .build();
+        newAddress.setLocationId(newLocation.getLocationId());
+        newLocation.setAddress(newAddress);
+        newLocation.normalize();
+        repository.save(newLocation);
+        return newLocation;
+    }
+
     public LocationResponse get(String id) {
         Location loc = repository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Location not found"));
         return toResponse(loc);
+    }
+
+    public String getLocationIdIfDontExistCreateNewLocation(String city, String stateCode, String countryCode){
+        boolean exist = repository.existsByAddress_CityAndAddress_StateCodeAndAddress_CountryCode(city, stateCode, countryCode);
+        if(exist){
+            Location location = repository.findByAddress_CityAndAddress_StateCodeAndAddress_CountryCode(city, stateCode, countryCode);
+            log.info("Returning location id: {} " + location.getLocationId());
+            return location.getLocationId();
+        }
+
+        Location newLocation = createLocation(city, stateCode, countryCode);
+        log.info("Returning location id: {} " + newLocation.getLocationId());
+        return newLocation.getLocationId();
     }
 
     public List<LocationResponse> getAll() {
@@ -86,11 +116,8 @@ public class LocationService {
 
             Address address = location.getAddress();
 
-            if(addrUpdates.containsKey("number")) address.setNumber(addrUpdates.get("number").toString());
-            if(addrUpdates.containsKey("street")) address.setStreet(addrUpdates.get("street").toString());
             if(addrUpdates.containsKey("city")) address.setCity(addrUpdates.get("city").toString());
             if(addrUpdates.containsKey("stateCode")) address.setStateCode(addrUpdates.get("stateCode").toString());
-            if(addrUpdates.containsKey("zip")) address.setZip(addrUpdates.get("zip").toString());
             if(addrUpdates.containsKey("countryCode")) address.setCountryCode(addrUpdates.get("countryCode").toString());
         }
 
@@ -118,17 +145,16 @@ public class LocationService {
                 .locationId(loc.getLocationId())
                 .name(loc.getName() != null ? loc.getName() : null)
                 .address(loc.getAddress().toDto())
-                .weather(loc.getWeather().toDto())
+                .weather(loc.getWeather() != null ? loc.getWeather().toDto() : null)
                 .build();
     }
 
+    // Builds address with all fields except locationId
+    // that will be set when a new location is created
     private Address buildAddress(LocationRequest request) {
         Address address = Address.builder()
-                .number(request.getAddress().getNumber())
-                .street(request.getAddress().getStreet())
                 .city(request.getAddress().getCity())
                 .stateCode(request.getAddress().getStateCode())
-                .zip(request.getAddress().getZip())
                 .countryCode(request.getAddress().getCountryCode())
                 .build();
         address.normalize();
@@ -136,7 +162,7 @@ public class LocationService {
         return address;
     }
 
-    private WeatherDto getWeatherData(String city, String stateCode, String countryCode) {
+    public WeatherDto getWeatherData(String city, String stateCode, String countryCode) {
         WeatherDto weatherDto = webClient.build().get()
                 .uri("http://weather-service/api/weather",
                         uriBuilder -> uriBuilder

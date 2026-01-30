@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -17,7 +19,7 @@ public class WeatherDto {
     private Double low_temperature;
     private Double cloudCoverage;
     private Double windSpeed;
-    private Long   fetchedAt;
+    private Instant fetchedAt;
 
     public Weather toWeather(){
         Weather weather = new Weather();

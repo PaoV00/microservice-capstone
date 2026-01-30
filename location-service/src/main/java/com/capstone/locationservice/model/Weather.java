@@ -3,6 +3,8 @@ package com.capstone.locationservice.model;
 import com.capstone.locationservice.dto.WeatherDto;
 import lombok.*;
 
+import java.time.Instant;
+
 @Builder
 @Getter
 @Setter
@@ -15,7 +17,7 @@ public class Weather {
     private Double low_temperature;
     private Double cloudCoverage;
     private Double windSpeed;
-    private Long   fetchedAt;
+    private Instant fetchedAt;
 
     public WeatherDto toDto() {
         return WeatherDto.builder()
