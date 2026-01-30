@@ -17,6 +17,7 @@ public class Weather {
     private Double low_temperature;
     private Double cloudCoverage;
     private Double windSpeed;
+    private Double precipitation;
     private Instant fetchedAt;
 
     public WeatherDto toDto() {
@@ -27,6 +28,7 @@ public class Weather {
                 .low_temperature(low_temperature)
                 .cloudCoverage(cloudCoverage)
                 .windSpeed(windSpeed)
+                .precipitation(precipitation)
                 .fetchedAt(fetchedAt)
                 .build();
     }

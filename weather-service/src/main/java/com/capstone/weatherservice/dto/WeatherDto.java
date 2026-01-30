@@ -16,5 +16,6 @@ public class WeatherDto {
     private Double low_temperature;
     private Double cloudCoverage;
     private Double windSpeed;
+    private Double precipitation;
     private Instant fetchedAt;
 }

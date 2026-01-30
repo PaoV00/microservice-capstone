@@ -23,6 +23,7 @@
         <module>location-service</module>
         <module>discovery-server</module>
         <module>api-gateway</module>
+        <module>alert-service</module>
     </modules>
 
     <properties>

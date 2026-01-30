@@ -1,5 +1,6 @@
 package com.capstone.userservice.exceptions.advice;
 
+import com.capstone.userservice.exceptions.AlreadyFavoritedException;
 import com.capstone.userservice.exceptions.BadInputException;
 import com.capstone.userservice.exceptions.DuplicateUserException;
 import com.capstone.userservice.exceptions.UserNotFoundException;
@@ -54,6 +55,15 @@ public class GlobalControllerAdvice {
                 "error", "Validation failed",
                 "details", errors,
                 "status", 400
+        );
+    }
+
+    @ExceptionHandler(AlreadyFavoritedException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public Map<String, Object> handleAlreadyFavorited(AlreadyFavoritedException ex) {
+        return Map.of(
+                "error", ex.getMessage(),
+                "status", 409
         );
     }
 }

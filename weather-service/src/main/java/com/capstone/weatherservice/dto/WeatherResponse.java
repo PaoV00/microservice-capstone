@@ -14,6 +14,8 @@ public class WeatherResponse {
     private Main main;
     private Wind wind;
     private Clouds clouds;
+    private Rain rain;
+    private Snow snow;
     private Sys sys;
     private long dt;
 
@@ -60,5 +62,24 @@ public class WeatherResponse {
         private Integer all;
     }
 
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Rain {
+        @JsonProperty("1h")
+        private Double oneHour;
+
+        @JsonProperty("3h")
+        private Double threeHours;
+    }
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Snow {
+        @JsonProperty("1h")
+        private Double oneHour;
+
+        @JsonProperty("3h")
+        private Double threeHours;
+    }
 
 }

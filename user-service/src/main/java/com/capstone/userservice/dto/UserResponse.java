@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.Set;
 
 @Data
 @AllArgsConstructor
@@ -18,6 +19,5 @@ public class UserResponse {
     private String lastName;
     private String email;
     private AddressDto address;
-    private String locationId;
-    private List<String> favoriteLocationIds;
+    private Set<String> favoriteLocationIds;
 }

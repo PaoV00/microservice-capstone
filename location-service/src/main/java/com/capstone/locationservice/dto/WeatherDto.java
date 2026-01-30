@@ -19,6 +19,7 @@ public class WeatherDto {
     private Double low_temperature;
     private Double cloudCoverage;
     private Double windSpeed;
+    private Double precipitation;
     private Instant fetchedAt;
 
     public Weather toWeather(){
@@ -29,6 +30,7 @@ public class WeatherDto {
         weather.setLow_temperature(low_temperature);
         weather.setCloudCoverage(cloudCoverage);
         weather.setWindSpeed(windSpeed);
+        weather.setPrecipitation(precipitation);
         weather.setFetchedAt(fetchedAt);
         return weather;
     }

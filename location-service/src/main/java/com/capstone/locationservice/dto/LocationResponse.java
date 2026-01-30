@@ -13,5 +13,4 @@ public class LocationResponse {
     private String locationId;
     private String name;
     private AddressDto address;
-    private WeatherDto weather;
 }

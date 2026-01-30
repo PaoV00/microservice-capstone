@@ -26,6 +26,7 @@ public class LocationServiceApplication {
             address1.setCity("saint paul");
             address1.setStateCode("MN");
             address1.setCountryCode("US");
+            address1.normalize();
 
             Location location1 = new Location();
             location1.setLocationId("test123id");

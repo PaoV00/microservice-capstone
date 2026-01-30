@@ -2,6 +2,7 @@ package com.capstone.userservice.service;
 
 import com.capstone.userservice.dto.UserRequest;
 import com.capstone.userservice.dto.UserResponse;
+import com.capstone.userservice.exceptions.AlreadyFavoritedException;
 import com.capstone.userservice.exceptions.BadInputException;
 import com.capstone.userservice.exceptions.DuplicateUserException;
 import com.capstone.userservice.exceptions.UserNotFoundException;
@@ -16,6 +17,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -39,7 +42,7 @@ public class UserService {
         // Only call location-service if address is present/valid
         String locationId = getLocationId(address);
         address.setLocationId(locationId);
-        log.info("Address set with locationId: {}" + locationId);
+        log.info("Address set with locationId: {}", locationId);
         User newUser = User.builder()
                 .firstName(userRequest.getFirstName())
                 .lastName(userRequest.getLastName())
@@ -55,13 +58,15 @@ public class UserService {
     }
 
     public UserResponse getUser(Long userId) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new UserNotFoundException("User not found"));
+        User user = getUserEntity(userId);
         log.info("User found: {}", user.getUserId());
         return mapToUserResponse(user);
     }
 
     public List<UserResponse> getAllUsers() {
-        return userRepository.findAll().stream().map(this::mapToUserResponse).toList();
+        return userRepository.findAll().stream()
+                .map(this::mapToUserResponse)
+                .collect(Collectors.toList());
     }
 
     public UserResponse updateUser(Long id, Map<String, Object> updates) {
@@ -139,6 +144,68 @@ public class UserService {
         log.info("User deleted: {}", userId);
     }
 
+    public Set<String> getFavoriteLocations(Long userId) {
+        User user = getUserEntity(userId);
+        UserResponse userResponse = mapToUserResponse(user);
+        return userResponse.getFavoriteLocationIds();
+    }
+
+    public void addFavoriteLocation(Long userId, String locationId) {
+        try {
+            // verify location exists
+            webClient.build().get()
+                    .uri("http://location-service/api/location/" + locationId)
+                    .retrieve()
+                    .bodyToMono(Void.class)
+                    .block();
+        } catch (Exception e) {
+            throw new BadInputException("Location not found: " + locationId);
+        }
+        User user = getUserEntity(userId);
+        // Check if location is already in favorites
+        if (user.getFavoriteLocationIds().contains(locationId)) {
+            throw new AlreadyFavoritedException("Location is already in favorites: " + locationId);
+        }
+
+        user = getUserEntity(userId);
+        user.getFavoriteLocationIds().add(locationId);
+        userRepository.save(user);
+    }
+
+    public void removeFavoriteLocation(Long userId, String locationId) {
+        User user = getUserEntity(userId);
+        user.getFavoriteLocationIds().remove(locationId);
+        userRepository.save(user);
+        log.info("Removed favorite location {} from user {}", locationId, userId);
+    }
+
+    public boolean isLocationFavorited(Long userId, String locationId) {
+        User user = getUserEntity(userId);
+        return user.getFavoriteLocationIds().contains(locationId);
+    }
+
+    public List<Long> getUsersByFavoriteLocationId(String locationId) {
+        return userRepository.findUsersByFavoriteLocationId(locationId)
+                .stream()
+                .map(User::getUserId)
+                .collect(Collectors.toList());
+    }
+
+    public List<Long> getUsersByLocation(String city, String stateCode, String countryCode) {
+        // Query users who live in this location (simplified - exact match)
+        return userRepository.findAll().stream()
+                .filter(user -> {
+                    Address addr = user.getAddress();
+                    return addr != null &&
+                            addr.getCity().equalsIgnoreCase(city) &&
+                            addr.getStateCode().equalsIgnoreCase(stateCode) &&
+                            addr.getCountryCode().equalsIgnoreCase(countryCode);
+                })
+                .map(User::getUserId)
+                .collect(Collectors.toList());
+    }
+
+    //------- Helper methods ------
     private UserResponse mapToUserResponse(User user) {
         return UserResponse.builder()
                 .userId(user.getUserId())
@@ -147,6 +214,7 @@ public class UserService {
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .address(user.getAddress().toDto())
+                .favoriteLocationIds(user.getFavoriteLocationIds())
                 .build();
     }
 
@@ -164,5 +232,8 @@ public class UserService {
         return locationId;
     }
 
-
+    private User getUserEntity(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+    }
 }

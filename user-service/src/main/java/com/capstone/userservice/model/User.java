@@ -6,8 +6,8 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Getter
@@ -36,6 +36,12 @@ public class User {
 
     @Embedded
     private Address address;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_favorites",
+            joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "location_id")
+    private Set<String> favoriteLocationIds = new HashSet<>();
 
     public void updateFirstName(String newFirst) {
         if (newFirst != null && !newFirst.equals(this.firstName)) this.firstName = newFirst;

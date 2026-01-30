@@ -4,6 +4,7 @@ package com.capstone.locationservice.controller;
 import com.capstone.locationservice.dto.LocationRequest;
 import com.capstone.locationservice.dto.LocationResponse;
 import com.capstone.locationservice.service.LocationService;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
