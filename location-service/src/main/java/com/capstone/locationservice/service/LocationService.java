@@ -12,9 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -67,6 +66,13 @@ public class LocationService {
         Location loc = repository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Location not found"));
         return toResponse(loc);
+    }
+
+    public List<LocationResponse> getAll() {
+        List<LocationResponse> locations = repository.findAll().stream()
+                .map(LocationResponse::new)
+                .collect(Collectors.toList());
+        return  locations;
     }
 
     public String getLocationIdIfDontExistCreateNewLocation(String city, String stateCode, String countryCode) {

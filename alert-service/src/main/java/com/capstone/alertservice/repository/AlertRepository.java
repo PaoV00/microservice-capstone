@@ -7,7 +7,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface AlertRepository extends JpaRepository<Alert, String> {
+public interface AlertRepository extends JpaRepository<Alert, Long> {
 
     List<Alert> findByUserIdOrderByCreatedAtDesc(Long userId);
 }

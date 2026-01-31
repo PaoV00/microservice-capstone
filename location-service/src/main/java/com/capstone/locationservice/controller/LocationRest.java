@@ -30,6 +30,11 @@ public class LocationRest {
         return ResponseEntity.ok(service.get(id));
     }
 
+    @GetMapping
+    public ResponseEntity<List<LocationResponse>> getAll() {
+        return ResponseEntity.ok(service.getAll());
+    }
+
     @GetMapping()
     public ResponseEntity<String> getAddressId(@RequestParam String city, @RequestParam String stateCode, @RequestParam String countryCode){
         return ResponseEntity.ok(service.getLocationIdIfDontExistCreateNewLocation(city, stateCode, countryCode));
