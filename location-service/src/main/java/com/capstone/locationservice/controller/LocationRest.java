@@ -35,7 +35,7 @@ public class LocationRest {
         return ResponseEntity.ok(service.getAll());
     }
 
-    @GetMapping()
+    @GetMapping("/")
     public ResponseEntity<String> getAddressId(@RequestParam String city, @RequestParam String stateCode, @RequestParam String countryCode){
         return ResponseEntity.ok(service.getLocationIdIfDontExistCreateNewLocation(city, stateCode, countryCode));
     }
