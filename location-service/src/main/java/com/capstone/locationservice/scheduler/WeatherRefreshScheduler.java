@@ -25,12 +25,6 @@ public class WeatherRefreshScheduler {
     private final LocationRepository locationRepository;
     private final AlertProducer alertProducer;
     private final WebClient.Builder webClient;
-    private WebClient builtWebClient;
-
-    @PostConstruct
-    public void init() {
-        this.builtWebClient = webClient.build();
-    }
 
     @Value("${weather.thresholds.wind-speed:20.0}")
     private double windSpeedThreshold;
@@ -44,7 +38,7 @@ public class WeatherRefreshScheduler {
     @Value("${weather.thresholds.precipitation:50.0}")
     private double precipitationThreshold;
 
-    // Changed from PT1M to PT5M to reduce API calls
+    // PT5M 5 minutes
     @Scheduled(fixedRateString = "PT5M")
     @SchedulerLock(
             name = "checkWeatherForAlerts",
@@ -63,7 +57,6 @@ public class WeatherRefreshScheduler {
             String locationId = loc.getLocationId();
 
             try {
-                // Fetch weather from weather-service with Circuit Breaker protection
                 WeatherDto dto = fetchWeatherFromService(city, state, country);
                 loc.setWeather(dto.toWeather());
                 if (dto != null) {
@@ -81,7 +74,7 @@ public class WeatherRefreshScheduler {
     }
 
     private WeatherDto fetchWeatherFromService(String city, String state, String country) {
-        return getWebClient()
+        return webClient.build()
                 .get()
                 .uri("http://weather-service/api/weather",
                         uriBuilder -> uriBuilder
@@ -97,7 +90,6 @@ public class WeatherRefreshScheduler {
     // Fallback for when Weather Service is down
     private void schedulerFallback(Exception ex) {
         log.error("Weather Service unavailable, skipping alert checks: {}", ex.getMessage());
-        // Could send a "service degraded" metric or notification
     }
 
     private void checkWeatherThresholds(String locationId, String city, String state,

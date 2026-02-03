@@ -3,6 +3,7 @@ package com.capstone.locationservice.controller;
 
 import com.capstone.locationservice.dto.LocationRequest;
 import com.capstone.locationservice.dto.LocationResponse;
+import com.capstone.locationservice.model.Location;
 import com.capstone.locationservice.service.LocationService;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
@@ -35,9 +36,15 @@ public class LocationRest {
         return ResponseEntity.ok(service.getAll());
     }
 
-    @GetMapping
+    @GetMapping("/id")
     public ResponseEntity<String> getAddressId(@RequestParam String city, @RequestParam String stateCode, @RequestParam String countryCode){
-        return ResponseEntity.ok(service.getLocationIdIfDontExistCreateNewLocation(city, stateCode, countryCode));
+        String locationId = service.getLocationIfDontExistCreateNewLocation(city, stateCode, countryCode).getLocationId();
+        return ResponseEntity.ok(locationId);
+    }
+
+    @GetMapping
+    public ResponseEntity<LocationResponse> getLocation(@RequestParam String city, @RequestParam String stateCode, @RequestParam String countryCode){
+        return ResponseEntity.ok(service.getLocationIfDontExistCreateNewLocation(stateCode, countryCode, city));
     }
 
     @PatchMapping("/{id}")

@@ -9,7 +9,6 @@ import com.capstone.locationservice.model.Address;
 import com.capstone.locationservice.model.Location;
 import com.capstone.locationservice.model.Weather;
 import com.capstone.locationservice.repository.LocationRepository;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,12 +28,6 @@ public class LocationService {
 
     private final LocationRepository repository;
     private final WebClient.Builder webClient;
-    private WebClient builtWebClient;
-
-    @PostConstruct
-    public void init() {
-        this.builtWebClient = webClient.build();
-    }
 
     public LocationResponse create(LocationRequest req) {
         if(repository.existsByAddress_CityIgnoreCaseAndAddress_StateCodeIgnoreCaseAndAddress_CountryCodeIgnoreCase(
@@ -61,51 +54,23 @@ public class LocationService {
     }
 
     public Weather getWeather(String city,String stateCode,String countryCode) {
-        try{
-            log.info("Attempting to fetch weather from weather-service for {},{},{}", city, stateCode, countryCode);
-            WeatherDto weatherDto = builtWebClient
-                    .get()
-                    .uri("http://weather-service/api/weather",
-                            uriBuilder -> uriBuilder
-                                    .queryParam("city", city)
-                                    .queryParam("stateCode", stateCode)
-                                    .queryParam("countryCode", countryCode)
-                                    .build())
-                    .retrieve()
-                    .onStatus(status -> !status.is2xxSuccessful(), response -> {
-                        log.error("Weather service returned status: {}", response.getStatusCode());
-                        return response.createException();
-                    })
-                    .bodyToMono(WeatherDto.class)
-                    .block();
-            log.info("Received WeatherDto: {}", weatherDto);
-            if (weatherDto == null) {
-                log.error("WeatherDto is null for {},{},{}", city, stateCode, countryCode);
-                return createDefaultWeather();
-            }
-
-            Weather weather = weatherDto.toWeather();
-            log.info("Converted to Weather: {}", weather);
-            return weather;
-        } catch (Exception e) {
-            log.error("Failed to fetch weather for {},{},{}: {}", 
-                    city, stateCode, countryCode, e.getMessage());
-            log.error("Exception details: ", e);
-            return createDefaultWeather();
-        }
-    }
-
-    private Weather createDefaultWeather() {
-        return Weather.builder()
-                .condition("Unknown")
-                .temperature(0.0)
-                .hi_temperature(0.0)
-                .low_temperature(0.0)
-                .cloudCoverage(0.0)
-                .windSpeed(0.0)
-                .precipitation(0.0)
-                .fetchedAt(Instant.now())
-                .build();
+        log.info("Attempting to fetch weather from weather-service for {},{},{}", city, stateCode, countryCode);
+        WeatherDto weatherDto = webClient.build()
+                .get()
+                .uri("http://weather-service/api/weather",
+                        uriBuilder -> uriBuilder
+                                .queryParam("city", city)
+                                .queryParam("stateCode", stateCode)
+                                .queryParam("countryCode", countryCode)
+                                .build())
+                .retrieve()
+                .onStatus(status -> !status.is2xxSuccessful(), response -> {
+                    log.error("Weather service returned status: {}", response.statusCode());
+                    return response.createException();
+                })
+                .bodyToMono(WeatherDto.class)
+                .block();
+        return weatherDto.toWeather();
     }
 
     public Location createLocation(String city, String stateCode, String countryCode) {
@@ -117,7 +82,7 @@ public class LocationService {
         Weather weather = getWeather(newAddress.getCity(), newAddress.getStateCode(), newAddress.getCountryCode());
         Location newLocation = Location.builder()
                 .locationId(UUID.randomUUID().toString())
-                .name(null)
+                .name(city)
                 .weather(weather)
                 .build();
         newAddress.setLocationId(newLocation.getLocationId());
@@ -140,7 +105,7 @@ public class LocationService {
         return  locations;
     }
 
-    public String getLocationIdIfDontExistCreateNewLocation(String city, String stateCode, String countryCode) {
+    public LocationResponse getLocationIfDontExistCreateNewLocation(String city, String stateCode, String countryCode) {
 
         // 1) Try to find existing location
         Optional<Location> existing = repository
@@ -149,7 +114,7 @@ public class LocationService {
 
         if (existing.isPresent()) {
             log.info("Returning existing location id: {}", existing.get().getLocationId());
-            return existing.get().getLocationId();
+            return toResponse(existing.get());
         }
 
         // 2) Not found — build new Location (but do not assume save will succeed)
@@ -158,7 +123,7 @@ public class LocationService {
         try {
             repository.save(newLocation);
             log.info("Created new location id: {}", newLocation.getLocationId());
-            return newLocation.getLocationId();
+            return toResponse(newLocation);
         } catch (Exception ex) {
             // Race: another request created it first. Re-query and return that id.
             Optional<Location> raced = repository
@@ -166,7 +131,7 @@ public class LocationService {
                             city, stateCode, countryCode);
             if (raced.isPresent()) {
                 log.info("Race detected, returning existing location id: {}", raced.get().getLocationId());
-                return raced.get().getLocationId();
+                return toResponse(raced.get());
             }
             // Unexpected:
             throw new DuplicateException("Location already exists");

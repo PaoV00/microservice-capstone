@@ -220,7 +220,7 @@ public class UserService {
 
     private String getLocationId(Address address) {
         String locationId = webClient.build().get()
-                .uri("http://location-service/api/location",
+                .uri("http://location-service/api/location/id",
                 uriBuilder -> uriBuilder
                         .queryParam("city", address.getCity())
                         .queryParam("stateCode", address.getStateCode())
