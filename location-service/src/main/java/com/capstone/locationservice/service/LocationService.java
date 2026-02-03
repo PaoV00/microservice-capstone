@@ -98,6 +98,12 @@ public class LocationService {
         return toResponse(loc);
     }
 
+    public LocationResponse getByCity(String city){
+        Location loc = repository.findByAddress_CityIgnoreCase(city)
+                .orElseThrow(() -> new NotFoundException("Location not found"));
+        return toResponse(loc);
+    }
+
     public List<LocationResponse> getAll() {
         List<LocationResponse> locations = repository.findAll().stream()
                 .map(LocationResponse::new)

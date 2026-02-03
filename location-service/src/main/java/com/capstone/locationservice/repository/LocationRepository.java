@@ -16,4 +16,5 @@ public interface LocationRepository extends MongoRepository<Location, String> {
     Optional<Location> findFirstByAddress_CityIgnoreCaseAndAddress_StateCodeIgnoreCaseAndAddress_CountryCodeIgnoreCase(
             String city, String stateCode, String countryCode);
 
+    Optional<Location> findByAddress_CityIgnoreCase(String city);
 }

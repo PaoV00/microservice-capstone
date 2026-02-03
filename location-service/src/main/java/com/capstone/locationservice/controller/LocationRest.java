@@ -31,6 +31,11 @@ public class LocationRest {
         return ResponseEntity.ok(service.get(id));
     }
 
+    @GetMapping("/{city}")
+    public ResponseEntity<LocationResponse> getByCity(@PathVariable String city) {
+        return ResponseEntity.ok(service.getByCity(city));
+    }
+
     @GetMapping("/")
     public ResponseEntity<List<LocationResponse>> getAll() {
         return ResponseEntity.ok(service.getAll());
