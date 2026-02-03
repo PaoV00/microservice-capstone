@@ -20,7 +20,7 @@ public class LocationServiceApplication {
     }
 
     @Bean
-    public CommandLineRunner loadData(LocationRepository locationRepository ) {
+    public CommandLineRunner loadData(LocationRepository locationRepository, LocationService locationService) {
         return (args) -> {
             Address address1 = new Address();
             address1.setCity("saint paul");
@@ -34,7 +34,6 @@ public class LocationServiceApplication {
 
             location1.setAddress(address1);
             location1.setName("Test Location");
-
 
             locationRepository.save(location1);
             log.info("Seed data inserted location with id: {}", location1.getLocationId());

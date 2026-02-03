@@ -28,6 +28,8 @@ public class Location {
     @Indexed(unique = true)
     private Address address;
 
+    private Weather weather;
+
     public void normalize() {
         if (name != null) name = name.trim();
         if (address != null) address.normalize();

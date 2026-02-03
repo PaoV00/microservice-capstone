@@ -1,6 +1,7 @@
 package com.capstone.locationservice.dto;
 
 import com.capstone.locationservice.model.Location;
+import com.capstone.locationservice.model.Weather;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,10 +15,12 @@ public class LocationResponse {
     private String locationId;
     private String name;
     private AddressDto address;
+    private WeatherDto weather;
 
     public LocationResponse(Location location) {
         this.locationId = location.getLocationId();
         this.name = location.getName();
         this.address = location.getAddress().toDto();
+        this.weather = location.getWeather().toDto();
     }
 }

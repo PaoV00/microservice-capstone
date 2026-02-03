@@ -58,7 +58,7 @@ public class WeatherRefreshScheduler {
             try {
                 // Fetch weather from weather-service with Circuit Breaker protection
                 WeatherDto dto = fetchWeatherFromService(city, state, country);
-
+                loc.setWeather(dto.toWeather());
                 if (dto != null) {
                     checkWeatherThresholds(locationId, city, state, country, dto);
                     log.debug("Weather check complete for location: {}", locationId);

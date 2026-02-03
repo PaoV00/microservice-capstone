@@ -26,6 +26,7 @@ public class Weather {
     @Column(nullable = false)
     private String countryCode;
 
+    @Column(name = "weather_condition")
     private String condition;
     private Double temperature;
     private Double hiTemperature;
