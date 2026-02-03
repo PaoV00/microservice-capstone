@@ -1,6 +1,7 @@
 package com.capstone.locationservice.dto;
 
 import com.capstone.locationservice.model.Weather;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,6 +13,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public class WeatherDto {
     private String condition;
     private Double temperature;

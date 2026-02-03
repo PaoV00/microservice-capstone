@@ -1,6 +1,7 @@
 package com.capstone.locationservice.dto;
 
 import com.capstone.locationservice.model.Address;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,6 +12,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public class AddressDto {
     @NotBlank private String city;
     @NotBlank private String stateCode;
