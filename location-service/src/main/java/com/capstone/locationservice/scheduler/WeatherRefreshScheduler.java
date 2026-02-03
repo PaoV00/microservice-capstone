@@ -6,6 +6,7 @@ import com.capstone.locationservice.messaging.AlertProducer;
 import com.capstone.locationservice.model.Location;
 import com.capstone.locationservice.repository.LocationRepository;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -24,6 +25,12 @@ public class WeatherRefreshScheduler {
     private final LocationRepository locationRepository;
     private final AlertProducer alertProducer;
     private final WebClient.Builder webClient;
+    private WebClient builtWebClient;
+
+    @PostConstruct
+    public void init() {
+        this.builtWebClient = webClient.build();
+    }
 
     @Value("${weather.thresholds.wind-speed:20.0}")
     private double windSpeedThreshold;
@@ -58,7 +65,7 @@ public class WeatherRefreshScheduler {
             try {
                 // Fetch weather from weather-service with Circuit Breaker protection
                 WeatherDto dto = fetchWeatherFromService(city, state, country);
-
+                loc.setWeather(dto.toWeather());
                 if (dto != null) {
                     checkWeatherThresholds(locationId, city, state, country, dto);
                     log.debug("Weather check complete for location: {}", locationId);
@@ -74,7 +81,7 @@ public class WeatherRefreshScheduler {
     }
 
     private WeatherDto fetchWeatherFromService(String city, String state, String country) {
-        return webClient.build()
+        return getWebClient()
                 .get()
                 .uri("http://weather-service/api/weather",
                         uriBuilder -> uriBuilder

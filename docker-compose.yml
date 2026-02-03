@@ -163,7 +163,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql-weather:3306/weather-service?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka:password@discovery-server:8761/eureka
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
-      WEATHER_API_KEY: ${WEATHER_API_KEY}
+      WEATHER_API_KEY: 0fad18a1272253334fe0b0e4d91c2b00
     depends_on:
       mysql-weather:
         condition: service_healthy
