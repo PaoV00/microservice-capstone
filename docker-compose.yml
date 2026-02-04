@@ -133,6 +133,7 @@ services:
 
   discovery-server:
     image: paovan/discovery-server:latest
+    pull_policy: always
     container_name: discovery-server
     ports:
       - "8761:8761"
@@ -144,6 +145,7 @@ services:
 
   api-gateway:
     image: paovan/api-gateway:latest
+    pull_policy: always
     container_name: api-gateway
     ports:
       - "8181:8080"
@@ -158,6 +160,7 @@ services:
   weather-service:
     container_name: weather-service
     image: paovan/weather-service:latest
+    pull_policy: always
     environment:
       SPRING_PROFILES_ACTIVE: docker
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql-weather:3306/weather-service?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
@@ -176,6 +179,7 @@ services:
   location-service:
     container_name: location-service
     image: paovan/location-service:latest
+    pull_policy: always
     environment:
       SPRING_PROFILES_ACTIVE: docker
       SPRING_DATA_MONGODB_URI: mongodb://mongo-location:27017/location-service
@@ -200,6 +204,7 @@ services:
   user-service:
     container_name: user-service
     image: paovan/user-service:latest
+    pull_policy: always
     environment:
       SPRING_PROFILES_ACTIVE: docker
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql-user:3306/user-service?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
@@ -217,6 +222,7 @@ services:
   alert-service:
     container_name: alert-service
     image: paovan/alert-service:latest
+    pull_policy: always
     environment:
       SPRING_PROFILES_ACTIVE: docker
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql-alert:3306/alert-service?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
