@@ -7,7 +7,6 @@ import com.capstone.weatherservice.repository.WeatherRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -20,7 +19,7 @@ import java.util.Optional;
 @Slf4j
 public class WeatherService {
 
-    private final WebClient webClient;
+    private final WebClient.Builder webClient;
     private final WeatherRepository weatherRepository;
 
     @Value("${weather.api.key}")
@@ -29,52 +28,111 @@ public class WeatherService {
     @Value("${weather.data.ttl.minutes:5}")
     private int dataTtlMinutes;
 
+    /**
+     * One row per (city,stateCode,countryCode).
+     * If row exists and not expired -> return.
+     * If expired -> fetch API -> update same row -> return.
+     * If row not exist -> fetch API -> insert -> return.
+     */
+    @Transactional
     public WeatherDto getWeatherData(String city, String stateCode, String countryCode) {
         Instant now = Instant.now();
 
-        // 1. Try to get fresh data from database
-        Optional<Weather> freshData = weatherRepository.findFreshWeather(
-                city, stateCode, countryCode, now);
+        // Normalize keys consistently (prevents case-based duplicates)
+        city = normalize(city);
+        stateCode = normalize(stateCode);
+        countryCode = normalize(countryCode);
 
-        if (freshData.isPresent()) {
-            log.debug("Returning fresh weather data from database for {},{},{}",
-                    city, stateCode, countryCode);
-            return convertToDto(freshData.get());
+        // If you added repository locking method, use that:
+        // Optional<Weather> existingOpt = weatherRepository.findForUpdate(city, stateCode, countryCode);
+        Optional<Weather> existingOpt = weatherRepository.findByCityAndStateCodeAndCountryCode(city, stateCode, countryCode);
+
+        // 1) If we already have a row and it's not expired, return it
+        if (existingOpt.isPresent()) {
+            Weather existing = existingOpt.get();
+            if (existing.getExpiresAt() != null && existing.getExpiresAt().isAfter(now)) {
+                log.debug("Returning cached weather for {},{},{}", city, stateCode, countryCode);
+                return convertToDto(existing);
+            }
         }
 
-        log.info("No fresh data found, fetching from OpenWeather API for {},{},{}",
-                city, stateCode, countryCode);
+        log.info("Weather expired/missing. Fetching from OpenWeather for {},{},{}", city, stateCode, countryCode);
 
-        // 2. Fetch from OpenWeather API
+        // 2) Fetch from API and update/insert
         try {
             WeatherResponse resp = fetchFromExternalApi(city, stateCode, countryCode);
             WeatherDto dto = convertFromApiResponse(resp);
 
-            // 3. Save to database
-            saveWeatherData(city, stateCode, countryCode, dto);
-
-            return dto;
-        } catch (Exception e) {
-            log.error("Failed to fetch weather from OpenWeather API: {}", e.getMessage());
-
-            // 4. Fallback: Get the most recent data (even if expired)
-            Optional<Weather> staleData = weatherRepository
-                    .findFirstByCityAndStateCodeAndCountryCodeOrderByFetchedAtDesc(
-                            city, stateCode, countryCode);
-
-            if (staleData.isPresent()) {
-                log.warn("Returning stale weather data as fallback for {},{},{}",
-                        city, stateCode, countryCode);
-                return convertToDto(staleData.get());
+            if (dto == null || dto.getFetchedAt() == null) {
+                throw new RuntimeException("OpenWeather returned empty/invalid response");
             }
 
-            // 5. No data at all
-            throw new RuntimeException("Weather data unavailable and no cached data found", e);
+            Weather saved = upsertWeather(existingOpt.orElse(null), city, stateCode, countryCode, dto);
+            return convertToDto(saved);
+
+        } catch (Exception e) {
+            log.error("Failed to fetch weather from OpenWeather: {}", e.getMessage(), e);
+
+            // 3) Fallback: if we have an existing row (even stale), return it
+            if (existingOpt.isPresent()) {
+                log.warn("Returning stale weather as fallback for {},{},{}", city, stateCode, countryCode);
+                return convertToDto(existingOpt.get());
+            }
+
+            // 4) Nothing in DB and API failed -> error
+            throw new RuntimeException("Weather unavailable and no cached data found", e);
         }
     }
 
+    private Weather upsertWeather(Weather existing, String city, String stateCode, String countryCode, WeatherDto dto) {
+        Instant fetchedAt = dto.getFetchedAt();
+        Instant expiresAt = fetchedAt.plusSeconds(dataTtlMinutes * 60L);
+
+        if (existing == null) {
+            // Insert new row (first time for this location)
+            Weather weather = Weather.builder()
+                    .city(city)
+                    .stateCode(stateCode)
+                    .countryCode(countryCode)
+                    .condition(dto.getCondition())
+                    .temperature(dto.getTemperature())
+                    .hiTemperature(dto.getHi_temperature())
+                    .lowTemperature(dto.getLow_temperature())
+                    .cloudCoverage(dto.getCloudCoverage())
+                    .windSpeed(dto.getWindSpeed())
+                    .precipitation(dto.getPrecipitation())
+                    .fetchedAt(fetchedAt)
+                    .expiresAt(expiresAt)
+                    .build();
+
+            Weather saved = weatherRepository.save(weather);
+            log.debug("Inserted weather row for {},{},{}", city, stateCode, countryCode);
+            return saved;
+        }
+
+        // Update existing row (expired)
+        existing.setCondition(dto.getCondition());
+        existing.setTemperature(dto.getTemperature());
+        existing.setHiTemperature(dto.getHi_temperature());
+        existing.setLowTemperature(dto.getLow_temperature());
+        existing.setCloudCoverage(dto.getCloudCoverage());
+        existing.setWindSpeed(dto.getWindSpeed());
+        existing.setPrecipitation(dto.getPrecipitation());
+        existing.setFetchedAt(fetchedAt);
+        existing.setExpiresAt(expiresAt);
+
+        Weather saved = weatherRepository.save(existing);
+        log.debug("Updated weather row for {},{},{}", city, stateCode, countryCode);
+        return saved;
+    }
+
+    private String normalize(String s) {
+        return s == null ? null : s.trim().toUpperCase();
+    }
+
     private WeatherResponse fetchFromExternalApi(String city, String stateCode, String countryCode) {
-        return webClient.get()
+        return webClient.build()
+                .get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/data/2.5/weather")
                         .queryParam("q", city + "," + stateCode + "," + countryCode)
@@ -84,26 +142,6 @@ public class WeatherService {
                 .retrieve()
                 .bodyToMono(WeatherResponse.class)
                 .block();
-    }
-
-    private void saveWeatherData(String city, String stateCode, String countryCode, WeatherDto dto) {
-        Weather weatherData = Weather.builder()
-                .city(city.toUpperCase())
-                .stateCode(stateCode.toUpperCase())
-                .countryCode(countryCode.toUpperCase())
-                .condition(dto.getCondition())
-                .temperature(dto.getTemperature())
-                .hiTemperature(dto.getHi_temperature())
-                .lowTemperature(dto.getLow_temperature())
-                .cloudCoverage(dto.getCloudCoverage())
-                .windSpeed(dto.getWindSpeed())
-                .precipitation(dto.getPrecipitation())
-                .fetchedAt(dto.getFetchedAt())
-                .expiresAt(dto.getFetchedAt().plusSeconds(dataTtlMinutes * 60L))
-                .build();
-
-        weatherRepository.save(weatherData);
-        log.debug("Saved weather data for {},{},{}", city, stateCode, countryCode);
     }
 
     // Convert from database entity to DTO
@@ -120,11 +158,9 @@ public class WeatherService {
                 .build();
     }
 
-    // Convert from API response to DTO
+    // Convert from API response to DTO (kept as you wrote it)
     private WeatherDto convertFromApiResponse(WeatherResponse weather) {
-        if (weather == null) {
-            return null;
-        }
+        if (weather == null) return null;
 
         String condition = Optional.ofNullable(weather.getWeather())
                 .filter(list -> !list.isEmpty())
@@ -136,10 +172,10 @@ public class WeatherService {
                 })
                 .orElse(null);
 
-        Double temperature   = weather.getMain() != null ? weather.getMain().getTemp()     : null;
-        Double lowTemperature= weather.getMain() != null ? weather.getMain().getTempMin()  : null;
-        Double hiTemperature = weather.getMain() != null ? weather.getMain().getTempMax()  : null;
-        Double windSpeed     = weather.getWind() != null ? weather.getWind().getSpeed()    : null;
+        Double temperature    = weather.getMain() != null ? weather.getMain().getTemp()    : null;
+        Double lowTemperature = weather.getMain() != null ? weather.getMain().getTempMin() : null;
+        Double hiTemperature  = weather.getMain() != null ? weather.getMain().getTempMax() : null;
+        Double windSpeed      = weather.getWind() != null ? weather.getWind().getSpeed()   : null;
 
         Double cloudCoverage = (weather.getClouds() != null && weather.getClouds().getAll() != null)
                 ? weather.getClouds().getAll().doubleValue()
@@ -148,14 +184,11 @@ public class WeatherService {
         Double precipitation = null;
         if (weather.getRain() != null && weather.getRain().getOneHour() != null) {
             precipitation = weather.getRain().getOneHour();
-        }
-        else if (weather.getSnow() != null && weather.getSnow().getOneHour() != null) {
+        } else if (weather.getSnow() != null && weather.getSnow().getOneHour() != null) {
             precipitation = weather.getSnow().getOneHour();
-        }
-        else if (weather.getRain() != null && weather.getRain().getThreeHours() != null) {
+        } else if (weather.getRain() != null && weather.getRain().getThreeHours() != null) {
             precipitation = weather.getRain().getThreeHours() / 3;
-        }
-        else if (weather.getSnow() != null && weather.getSnow().getThreeHours() != null) {
+        } else if (weather.getSnow() != null && weather.getSnow().getThreeHours() != null) {
             precipitation = weather.getSnow().getThreeHours() / 3;
         }
 
