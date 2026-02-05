@@ -49,7 +49,7 @@ public class LocationRest {
 
     @GetMapping
     public ResponseEntity<LocationResponse> getLocation(@RequestParam String city, @RequestParam String stateCode, @RequestParam String countryCode){
-        return ResponseEntity.ok(service.getLocationIfDontExistCreateNewLocation(stateCode, countryCode, city));
+        return ResponseEntity.ok(service.getLocationIfDontExistCreateNewLocation(city, stateCode, countryCode));
     }
 
     @PatchMapping("/{id}")
