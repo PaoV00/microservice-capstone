@@ -15,7 +15,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 @RequiredArgsConstructor
@@ -26,17 +30,22 @@ public class WeatherRefreshScheduler {
     private final AlertProducer alertProducer;
     private final WebClient.Builder webClient;
 
-    @Value("${weather.thresholds.wind-speed:20.0}")
+    @Value("${weather.thresholds.wind-speed}")
     private double windSpeedThreshold;
 
-    @Value("${weather.thresholds.high-temp:35.0}")
+    @Value("${weather.thresholds.high-temp}")
     private double highTempThreshold;
 
-    @Value("${weather.thresholds.low-temp:-10.0}")
+    @Value("${weather.thresholds.low-temp}")
     private double lowTempThreshold;
 
-    @Value("${weather.thresholds.precipitation:50.0}")
+    @Value("${weather.thresholds.precipitation}")
     private double precipitationThreshold;
+
+    @Value("${alert.cooldown.minutes:60}")  // Don't send same alert within 1 hour
+    private long alertCooldownMinutes;
+
+    private final Map<String, Map<AlertEvent.AlertType, Instant>> lastAlertTimes = new ConcurrentHashMap<>();
 
     // PT5M 5 minutes
     @Scheduled(fixedRateString = "PT5M")
@@ -96,53 +105,87 @@ public class WeatherRefreshScheduler {
                                         String country, WeatherDto weather) {
         // Check wind speed
         if (weather.getWindSpeed() != null && weather.getWindSpeed() > windSpeedThreshold) {
-            String severity = weather.getWindSpeed() > 30.0 ? "SEVERE" :
-                    weather.getWindSpeed() > 25.0 ? "HIGH" : "MEDIUM";
+            if (shouldSendAlert(locationId, AlertEvent.AlertType.HIGH_WIND)) {
+                String severity = weather.getWindSpeed() > 30.0 ? "SEVERE" :
+                        weather.getWindSpeed() > 25.0 ? "HIGH" : "MEDIUM";
 
-            alertProducer.sendWeatherAlert(
-                    locationId, city, state, country,
-                    AlertEvent.AlertType.HIGH_WIND,
-                    "High Wind Warning",
-                    weather.getWindSpeed(),
-                    windSpeedThreshold,
-                    severity
-            );
+                alertProducer.sendWeatherAlert(
+                        locationId, city, state, country,
+                        AlertEvent.AlertType.HIGH_WIND,
+                        "High Wind Warning",
+                        weather.getWindSpeed(),
+                        windSpeedThreshold,
+                        severity
+                );
+
+                recordAlertSent(locationId, AlertEvent.AlertType.HIGH_WIND);
+            }
         }
 
         // Check high temperature
         if (weather.getTemperature() != null && weather.getTemperature() > highTempThreshold) {
-            alertProducer.sendWeatherAlert(
-                    locationId, city, state, country,
-                    AlertEvent.AlertType.EXTREME_TEMPERATURE,
-                    "Heat Warning",
-                    weather.getTemperature(),
-                    highTempThreshold,
-                    "HIGH"
-            );
+            if (shouldSendAlert(locationId, AlertEvent.AlertType.EXTREME_TEMPERATURE)){
+                alertProducer.sendWeatherAlert(
+                        locationId, city, state, country,
+                        AlertEvent.AlertType.EXTREME_TEMPERATURE,
+                        "Heat Warning",
+                        weather.getTemperature(),
+                        highTempThreshold,
+                        "HIGH"
+                );
+                recordAlertSent(locationId, AlertEvent.AlertType.EXTREME_TEMPERATURE);
+            }
         }
 
         // Check low temperature
         if (weather.getTemperature() != null && weather.getTemperature() < lowTempThreshold) {
-            alertProducer.sendWeatherAlert(
-                    locationId, city, state, country,
-                    AlertEvent.AlertType.EXTREME_TEMPERATURE,
-                    "Cold Warning",
-                    weather.getTemperature(),
-                    lowTempThreshold,
-                    "HIGH"
-            );
+            if (shouldSendAlert(locationId, AlertEvent.AlertType.EXTREME_TEMPERATURE)) {
+                alertProducer.sendWeatherAlert(
+                        locationId, city, state, country,
+                        AlertEvent.AlertType.EXTREME_TEMPERATURE,
+                        "Cold Warning",
+                        weather.getTemperature(),
+                        lowTempThreshold,
+                        "HIGH"
+                );
+                recordAlertSent(locationId, AlertEvent.AlertType.EXTREME_TEMPERATURE);
+            }
         }
 
-        // Check precipitation (cloud coverage as proxy)
-        if (weather.getCloudCoverage() != null && weather.getCloudCoverage() > precipitationThreshold) {
-            alertProducer.sendWeatherAlert(
-                    locationId, city, state, country,
-                    AlertEvent.AlertType.HEAVY_PRECIPITATION,
-                    "Heavy Precipitation Expected",
-                    weather.getCloudCoverage(),
-                    precipitationThreshold,
-                    "MEDIUM"
-            );
+        // Check precipitation
+        if (weather.getPrecipitation() != null && weather.getPrecipitation() > precipitationThreshold) {
+            if (shouldSendAlert(locationId, AlertEvent.AlertType.HEAVY_PRECIPITATION)) {
+                alertProducer.sendWeatherAlert(
+                        locationId, city, state, country,
+                        AlertEvent.AlertType.HEAVY_PRECIPITATION,
+                        "Heavy Precipitation Expected",
+                        weather.getPrecipitation(),
+                        precipitationThreshold,
+                        "MEDIUM"
+                );
+                recordAlertSent(locationId, AlertEvent.AlertType.HEAVY_PRECIPITATION);
+            }
         }
+    }
+
+    private boolean shouldSendAlert(String locationId, AlertEvent.AlertType alertType) {
+        Map<AlertEvent.AlertType, Instant> locationAlerts = lastAlertTimes.get(locationId);
+        if (locationAlerts == null) {
+            return true; // No previous alerts for this location
+        }
+
+        Instant lastAlert = locationAlerts.get(alertType);
+        if (lastAlert == null) {
+            return true; // No previous alert of this type
+        }
+
+        // Check if cooldown period has passed
+        Instant cooldownEnd = lastAlert.plus(Duration.ofMinutes(alertCooldownMinutes));
+        return Instant.now().isAfter(cooldownEnd);
+    }
+
+    private void recordAlertSent(String locationId, AlertEvent.AlertType alertType) {
+        lastAlertTimes.computeIfAbsent(locationId, k -> new ConcurrentHashMap<>())
+                .put(alertType, Instant.now());
     }
 }

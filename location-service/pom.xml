@@ -101,6 +101,10 @@
             <groupId>net.javacrumbs.shedlock</groupId>
             <artifactId>shedlock-provider-mongo</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-core</artifactId>
+        </dependency>
 
     </dependencies>
 

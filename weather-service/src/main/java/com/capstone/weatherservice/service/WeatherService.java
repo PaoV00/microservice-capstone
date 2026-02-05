@@ -12,6 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.chrono.ChronoLocalDateTime;
 import java.util.Optional;
 
 @Service
@@ -36,7 +39,7 @@ public class WeatherService {
      */
     @Transactional
     public WeatherDto getWeatherData(String city, String stateCode, String countryCode) {
-        Instant now = Instant.now();
+        LocalDateTime now = LocalDateTime.now();
 
         // Normalize keys consistently (prevents case-based duplicates)
         city = normalize(city);
@@ -47,7 +50,7 @@ public class WeatherService {
         // Optional<Weather> existingOpt = weatherRepository.findForUpdate(city, stateCode, countryCode);
         Optional<Weather> existingOpt = weatherRepository.findByCityAndStateCodeAndCountryCode(city, stateCode, countryCode);
 
-        // 1) If we already have a row and it's not expired, return it
+        // 1) If we already have a row, and it's not expired, return it
         if (existingOpt.isPresent()) {
             Weather existing = existingOpt.get();
             if (existing.getExpiresAt() != null && existing.getExpiresAt().isAfter(now)) {
@@ -85,8 +88,8 @@ public class WeatherService {
     }
 
     private Weather upsertWeather(Weather existing, String city, String stateCode, String countryCode, WeatherDto dto) {
-        Instant fetchedAt = dto.getFetchedAt();
-        Instant expiresAt = fetchedAt.plusSeconds(dataTtlMinutes * 60L);
+        LocalDateTime fetchedAt = dto.getFetchedAt();
+        LocalDateTime expiresAt = fetchedAt.plusSeconds(dataTtlMinutes * 60L);
 
         if (existing == null) {
             // Insert new row (first time for this location)
@@ -192,7 +195,7 @@ public class WeatherService {
             precipitation = weather.getSnow().getThreeHours() / 3;
         }
 
-        Instant fetchedAt = Instant.ofEpochSecond(weather.getDt());
+        LocalDateTime fetchedAt = LocalDateTime.ofInstant(Instant.ofEpochSecond(weather.getDt()), ZoneId.systemDefault());
 
         return WeatherDto.builder()
                 .condition(condition)

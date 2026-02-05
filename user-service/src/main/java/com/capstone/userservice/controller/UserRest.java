@@ -27,7 +27,7 @@ public class UserRest {
     private final UserService userService;
 
     @PostMapping
-    @CircuitBreaker(name = "userService", fallbackMethod = "fallbackMethod1")
+    @CircuitBreaker(name = "locationService", fallbackMethod = "fallbackMethod1")
     public ResponseEntity<UserResponse> createUser(@Valid @RequestBody UserRequest userRequest) {
         UserResponse userResponse = userService.createUser(userRequest);
         URI loc = URI.create("/user/" + userResponse.getUserId());
@@ -62,7 +62,7 @@ public class UserRest {
     }
 
     @PostMapping("/{id}/favorites")
-    @CircuitBreaker(name = "userService", fallbackMethod = "fallbackMethod2")
+    @CircuitBreaker(name = "locationService", fallbackMethod = "fallbackMethod2")
     public ResponseEntity<Void> addFavoriteLocation(
             @PathVariable Long id,
             @RequestBody FavoriteRequest request) {

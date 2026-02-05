@@ -3,20 +3,21 @@ package com.capstone.locationservice.service;
 import com.capstone.locationservice.dto.LocationRequest;
 import com.capstone.locationservice.dto.LocationResponse;
 import com.capstone.locationservice.dto.WeatherDto;
+import com.capstone.locationservice.event.AlertEvent;
 import com.capstone.locationservice.exceptions.DuplicateException;
 import com.capstone.locationservice.exceptions.NotFoundException;
+import com.capstone.locationservice.messaging.AlertProducer;
 import com.capstone.locationservice.model.Address;
 import com.capstone.locationservice.model.Location;
 import com.capstone.locationservice.model.Weather;
 import com.capstone.locationservice.repository.LocationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import jakarta.annotation.PostConstruct;
-import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,6 +29,21 @@ public class LocationService {
 
     private final LocationRepository repository;
     private final WebClient.Builder webClient;
+    private final AlertProducer alertProducer;
+
+    //region WEATHER THRESHOLDS
+    @Value("${weather.thresholds.wind-speed:20.0}")
+    private double windSpeedThreshold;
+
+    @Value("${weather.thresholds.high-temp:35.0}")
+    private double highTempThreshold;
+
+    @Value("${weather.thresholds.low-temp:-10.0}")
+    private double lowTempThreshold;
+
+    @Value("${weather.thresholds.precipitation:50.0}")
+    private double precipitationThreshold;
+    //endregion
 
     public LocationResponse create(LocationRequest req) {
         if(repository.existsByAddress_CityIgnoreCaseAndAddress_StateCodeIgnoreCaseAndAddress_CountryCodeIgnoreCase(
@@ -40,6 +56,7 @@ public class LocationService {
         log.info("Creating location for: {}, {}, {}", newAddress.getCity(), newAddress.getStateCode(), newAddress.getCountryCode());
         Weather weather = getWeather(newAddress.getCity(), newAddress.getStateCode(), newAddress.getCountryCode());
         log.info("Fetched weather: {}", weather);
+
         Location location = Location.builder()
                 .locationId(UUID.randomUUID().toString())
                 .name(req.getName() != null ? req.getName() : null)
@@ -50,6 +67,7 @@ public class LocationService {
         location.normalize();
 
         repository.save(location);
+        checkWeatherThresholdsImmediately(weather, location.getAddress());
         return toResponse(location);
     }
 
@@ -80,6 +98,7 @@ public class LocationService {
         newAddress.setCountryCode(countryCode);
         newAddress.normalize();
         Weather weather = getWeather(newAddress.getCity(), newAddress.getStateCode(), newAddress.getCountryCode());
+
         Location newLocation = Location.builder()
                 .locationId(UUID.randomUUID().toString())
                 .name(city)
@@ -89,6 +108,7 @@ public class LocationService {
         newLocation.setAddress(newAddress);
         newLocation.normalize();
         repository.save(newLocation);
+        checkWeatherThresholdsImmediately(weather, newLocation.getAddress());
         return newLocation;
     }
 
@@ -192,5 +212,65 @@ public class LocationService {
         address.normalize();
 
         return address;
+    }
+
+    private void checkWeatherThresholdsImmediately(Weather weather, Address address) {
+        if (weather == null) return;
+
+        String locationId = address.getLocationId();
+        String city = address.getCity();
+        String state = address.getStateCode();
+        String country = address.getCountryCode();
+
+        // Check wind speed
+        if (weather.getWindSpeed() != null && weather.getWindSpeed() > windSpeedThreshold) {
+            String severity = weather.getWindSpeed() > 30.0 ? "SEVERE" :
+                    weather.getWindSpeed() > 25.0 ? "HIGH" : "MEDIUM";
+
+            alertProducer.sendWeatherAlert(
+                    locationId, city, state, country,
+                    AlertEvent.AlertType.HIGH_WIND,
+                    "High Wind Warning",
+                    weather.getWindSpeed(),
+                    windSpeedThreshold,
+                    severity
+            );
+        }
+
+        // Check high temperature
+        if (weather.getTemperature() != null && weather.getTemperature() > highTempThreshold) {
+            alertProducer.sendWeatherAlert(
+                    locationId, city, state, country,
+                    AlertEvent.AlertType.EXTREME_TEMPERATURE,
+                    "Heat Warning",
+                    weather.getTemperature(),
+                    highTempThreshold,
+                    "HIGH"
+            );
+        }
+
+        // Check low temperature
+        if (weather.getTemperature() != null && weather.getTemperature() < lowTempThreshold) {
+            alertProducer.sendWeatherAlert(
+                    locationId, city, state, country,
+                    AlertEvent.AlertType.EXTREME_TEMPERATURE,
+                    "Cold Warning",
+                    weather.getTemperature(),
+                    lowTempThreshold,
+                    "HIGH"
+            );
+        }
+
+        // Check precipitation (cloud coverage as proxy)
+        if (weather.getCloudCoverage() != null && weather.getCloudCoverage() > precipitationThreshold) {
+            alertProducer.sendWeatherAlert(
+                    locationId, city, state, country,
+                    AlertEvent.AlertType.HEAVY_PRECIPITATION,
+                    "Heavy Precipitation Expected",
+                    weather.getCloudCoverage(),
+                    precipitationThreshold,
+                    "MEDIUM"
+            );
+        }
     }
 }

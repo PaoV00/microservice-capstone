@@ -36,7 +36,7 @@ public class AlertService {
         List<Long> usersInLocation = getUsersInLocation(
                 alertEvent.getCity(), alertEvent.getStateCode(), alertEvent.getCountryCode());
 
-        // 3. Combine and deduplicate user IDs
+        // 3. combine and get rid of duplicates
         List<Long> allUserIds = new ArrayList<>(userIds);
         allUserIds.addAll(usersInLocation);
         List<Long> uniqueUserIds = allUserIds.stream().distinct().collect(Collectors.toList());
@@ -65,7 +65,7 @@ public class AlertService {
         return alertRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
-    // Keep user retrieval methods as-is
+
     private List<Long> getUsersWhoFavoritedLocation(String locationId) {
         try {
             return webclient.build()

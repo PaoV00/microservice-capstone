@@ -19,9 +19,6 @@ public class AlertProducer {
 
     private final KafkaTemplate<String, AlertEvent> kafkaTemplate;
 
-    @Value("${kafka.topics.weather-alerts}")
-    private String weatherAlertsTopic;
-
     public void sendWeatherAlert(String locationId, String city, String stateCode, String countryCode,
                                  AlertEvent.AlertType alertType, String condition,
                                  Double currentValue, Double thresholdValue, String severity) {
@@ -43,7 +40,7 @@ public class AlertProducer {
                 .build();
 
         CompletableFuture<SendResult<String, AlertEvent>> future =
-                kafkaTemplate.send(weatherAlertsTopic, locationId, event);
+                kafkaTemplate.send("weatherAlerts", locationId, event);
 
         future.whenComplete((result, ex) -> {
             if (ex == null) {

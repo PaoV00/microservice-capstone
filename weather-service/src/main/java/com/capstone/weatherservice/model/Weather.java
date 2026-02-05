@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 
 @Entity
 @Getter
@@ -36,10 +37,10 @@ public class Weather {
     private Double precipitation;
 
     @Column(nullable = false)
-    private Instant fetchedAt;
+    private LocalDateTime fetchedAt;
 
     @Column(nullable = false)
-    private Instant expiresAt;
+    private LocalDateTime expiresAt;
 
     @Column(nullable = false)
     private String source;
@@ -47,10 +48,10 @@ public class Weather {
     @PrePersist
     protected void onCreate() {
         if (fetchedAt == null) {
-            fetchedAt = Instant.now();
+            fetchedAt = LocalDateTime.now();
         }
         if (expiresAt == null) {
-            expiresAt = fetchedAt.plusSeconds(300); // 5 minutes TTL
+            expiresAt = fetchedAt.plusSeconds(300);
         }
         if (source == null) {
             source = "OPENWEATHER";

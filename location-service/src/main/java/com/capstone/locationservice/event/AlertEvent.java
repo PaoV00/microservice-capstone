@@ -34,7 +34,5 @@ public class AlertEvent {
         EXTREME_TEMPERATURE,
         HEAVY_PRECIPITATION,
         STORM_WARNING,
-        HEAT_WAVE,
-        COLD_WAVE
     }
 }
