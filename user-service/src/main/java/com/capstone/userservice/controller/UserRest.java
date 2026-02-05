@@ -1,5 +1,6 @@
 package com.capstone.userservice.controller;
 
+import com.capstone.userservice.dto.AddressDto;
 import com.capstone.userservice.dto.FavoriteRequest;
 import com.capstone.userservice.dto.UserRequest;
 import com.capstone.userservice.dto.UserResponse;
@@ -12,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,7 +27,7 @@ public class UserRest {
     private final UserService userService;
 
     @PostMapping
-    @CircuitBreaker(name = "locationService", fallbackMethod = "fallbackMethod1")
+    @CircuitBreaker(name = "userService", fallbackMethod = "fallbackMethod1")
     public ResponseEntity<UserResponse> createUser(@Valid @RequestBody UserRequest userRequest) {
         UserResponse userResponse = userService.createUser(userRequest);
         URI loc = URI.create("/user/" + userResponse.getUserId());
@@ -60,7 +62,7 @@ public class UserRest {
     }
 
     @PostMapping("/{id}/favorites")
-    @CircuitBreaker(name = "locationService", fallbackMethod = "fallbackMethod2")
+    @CircuitBreaker(name = "userService", fallbackMethod = "fallbackMethod2")
     public ResponseEntity<Void> addFavoriteLocation(
             @PathVariable Long id,
             @RequestBody FavoriteRequest request) {
@@ -97,11 +99,23 @@ public class UserRest {
         return ResponseEntity.ok(userService.getUsersByLocation(city, stateCode, countryCode));
     }
 
-    public String fallbackMethod1(UserRequest userRequest, RuntimeException ex) {
-        return "Oops! Something went wrong, try again later!";
+    public ResponseEntity<UserResponse> fallbackMethod1(UserRequest userRequest, Throwable throwable) {
+        log.error("Fallback: {}", throwable.getMessage());
+        return ResponseEntity.status(503).body(
+                UserResponse.builder()
+                        .userId(0L)
+                        .firstName("Service")
+                        .lastName("Unavailable")
+                        .username("temporary")
+                        .email("temp@example.com")
+                        .address(new AddressDto())
+                        .favoriteLocationIds(new HashSet<>())
+                        .build()
+        );
     }
 
-    public String fallbackMethod2(Long id, FavoriteRequest request, RuntimeException ex) {
-        return "Oops! Something went wrong, try again later!";
+    public ResponseEntity<Void> fallbackMethod2(Long id, FavoriteRequest request, Throwable throwable) {
+        log.error("Fallback: {}", throwable.getMessage());
+        return ResponseEntity.status(503).build();
     }
 }
